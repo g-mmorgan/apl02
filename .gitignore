@@ -1,0 +1,33 @@
+# Variables de entorno (datos sensibles)
+.env
+.env.*
+
+# Claves y certificados
+*.key
+*.pem
+*.crt
+
+# Archivos de configuración local
+*.local
+
+# Logs
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Carpetas comunes de dependencias
+node_modules/
+
+# Builds
+dist/
+build/
+
+# Editores
+.vscode/
+.idea/
+
+# Temporales
+*.tmp
+*.swp
