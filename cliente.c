@@ -10,12 +10,14 @@
 #include <openssl/rand.h>
 // ERR para imprimir errores de OpenSSL
 #include <openssl/err.h>
+// AES_BLOCK_SIZE = 16, necesario para calcular el margen del buffer cifrado
+#include <openssl/aes.h>
 
 #include "common.h"
 #include "crypto_utils.h"
 
-// enlazar la libreria Winsock automaticamente
-#pragma comment(lib, "ws2_32.lib")
+// en gcc/MinGW el linkado de ws2_32 se hace con -lws2_32 al compilar
+// #pragma comment solo funciona en MSVC, en gcc se omite
 
 // ip del servidor (loopback para pruebas en la misma maquina)
 #define IP_SERVIDOR "127.0.0.1"
@@ -80,8 +82,8 @@ static unsigned char *leer_fichero(const char *ruta, long *tamano)
     fclose(f);
 
     if ((long)leidos != *tamano) {
-        printf("[cliente] error de lectura: leidos %zu de %ld bytes\n",
-               leidos, *tamano);
+        printf("[cliente] error de lectura: leidos %Iu de %ld bytes\n",
+               leidos, *tamano); // %Iu para size_t en MinGW 4.8.1
         free(buf);
         return NULL;
     }
@@ -191,9 +193,9 @@ int main(int argc, char *argv[])
     memcpy(meta.iv, iv, TAM_IV);
     meta.len_clave_cifrada = len_clave_cifrada;
 
-    printf("[cliente] metadatos preparados: '%s', %llu bytes, %s\n",
+    printf("[cliente] metadatos preparados: '%s', %I64u bytes, %s\n",
            meta.nombre_fichero,
-           (unsigned long long)meta.longitud_fichero,
+           (unsigned long long)meta.longitud_fichero, // %I64u para uint64_t en MinGW 4.8.1
            meta.fecha_hora);
 
     //creacion del socket TCP

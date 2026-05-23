@@ -8,8 +8,8 @@
 #include "common.h"
 #include "crypto_utils.h"
 
-// enlazar la libreria Winsock automaticamente (equivale a -lws2_32)
-#pragma comment(lib, "ws2_32.lib")
+// en gcc/MinGW el linkado de ws2_32 se hace con -lws2_32 al compilar
+// #pragma comment solo funciona en MSVC, en gcc se omite
 
 // ruta al fichero PEM con la clave privada RSA del servidor
 // el cliente usa el certificado (server_cert.pem) y el servidor la clave privada
@@ -58,7 +58,7 @@ static void atender_cliente(SOCKET sock_cliente)
 
     // mostramos la informacion del fichero que nos manda el cliente
     printf("[servidor] fichero    : %s\n",  meta.nombre_fichero);
-    printf("[servidor] tamano     : %llu bytes\n", (unsigned long long)meta.longitud_fichero);
+    printf("[servidor] tamano     : %I64u bytes\n", (unsigned long long)meta.longitud_fichero); // %I64u es el formato correcto para uint64_t en MinGW 4.8.1
     printf("[servidor] fecha/hora : %s\n",  meta.fecha_hora);
     printf("[servidor] len clave cifrada: %d bytes\n", meta.len_clave_cifrada);
 
@@ -97,8 +97,8 @@ static void atender_cliente(SOCKET sock_cliente)
         printf("[servidor] error al recibir tamano del fichero cifrado\n");
         return;
     }
-    printf("[servidor] tamano del bloque cifrado a recibir: %llu bytes\n",
-           (unsigned long long)tam_cifrado);
+    printf("[servidor] tamano del bloque cifrado a recibir: %I64u bytes\n",
+           (unsigned long long)tam_cifrado); // %I64u para uint64_t en MinGW 4.8.1
 
     // paso 5: recibir el fichero cifrado completo en bloques
     // usamos malloc dinamico porque el fichero puede ser grande
@@ -114,7 +114,7 @@ static void atender_cliente(SOCKET sock_cliente)
         free(buf_cifrado);
         return;
     }
-    printf("[servidor] fichero cifrado recibido (%llu bytes)\n",
+    printf("[servidor] fichero cifrado recibido (%I64u bytes)\n",
            (unsigned long long)tam_cifrado);
 
     // paso 6: descifrar el fichero con AES-256-CBC
@@ -157,8 +157,8 @@ static void atender_cliente(SOCKET sock_cliente)
     free(buf_descifrado);
 
     if ((int)escritos != len_descifrado) {
-        printf("[servidor] error al escribir el fichero: escribio %zu de %d bytes\n",
-               escritos, len_descifrado);
+        printf("[servidor] error al escribir el fichero: escribio %Iu de %d bytes\n",
+               escritos, len_descifrado); // %Iu es el formato correcto para size_t en MinGW 4.8.1
         return;
     }
 

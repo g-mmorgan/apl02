@@ -7,7 +7,7 @@
 #   - prueba los ejecutables reales con un fichero de verdad
 #
 # requisitos: python 3.x, openssl en PATH, gcc en PATH
-# ejecutar:   python tester_practica.py
+# ejecutar:   python tester.py
 
 import os
 import sys
@@ -22,7 +22,6 @@ import shutil
 import random
 from datetime import datetime
 
-# intentar importar cryptography; si no esta la instalamos solos
 try:
     from cryptography.hazmat.primitives import serialization, hashes
     from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -43,103 +42,97 @@ TAM_CLAVE_RSA  = 2048
 MAX_NOMBRE     = 256
 TIMEOUT_SOCKET = 5
 
-# paths de openssl y gcc en tu maquina (detectados automaticamente)
-OPENSSL_DIR    = r"C:\OpenSSL-Win64"
-OPENSSL_INC    = os.path.join(OPENSSL_DIR, "include")
-OPENSSL_LIB    = os.path.join(OPENSSL_DIR, "lib")
+OPENSSL_DIR = r"C:\OpenSSL-Win64"
+OPENSSL_INC = os.path.join(OPENSSL_DIR, "include")
+OPENSSL_LIB = os.path.join(OPENSSL_DIR, "lib")
 
-# contadores globales
 ok    = 0
 fail  = 0
 warns = 0
 
-# directorio temporal para las pruebas (se borra al acabar)
 DIR_TEMP = tempfile.mkdtemp(prefix="tester_apl02_")
 
-# rutas de claves dentro del directorio temporal
 RUTA_CLAVE_PRIVADA = os.path.join(DIR_TEMP, "server_key.pem")
 RUTA_CERTIFICADO   = os.path.join(DIR_TEMP, "server_cert.pem")
 
 # ─────────────────────────────────────────────
 # colores y log
+# compatible con Python 3.8: sin comillas anidadas en f-strings
 # ─────────────────────────────────────────────
 
-def verde(t):    return f"\033[92m{t}\033[0m"
-def rojo(t):     return f"\033[91m{t}\033[0m"
-def amarillo(t): return f"\033[93m{t}\033[0m"
-def cyan(t):     return f"\033[96m{t}\033[0m"
-def negrita(t):  return f"\033[1m{t}\033[0m"
+def verde(t):    return "\033[92m" + t + "\033[0m"
+def rojo(t):     return "\033[91m" + t + "\033[0m"
+def amarillo(t): return "\033[93m" + t + "\033[0m"
+def cyan(t):     return "\033[96m" + t + "\033[0m"
+def negrita(t):  return "\033[1m"  + t + "\033[0m"
 
 def log_ok(msg):
-    global ok; ok += 1
-    print(f"  {verde('[OK]')}   {msg}")
+    global ok
+    ok += 1
+    print("  " + verde("[OK]") + "   " + msg)
 
 def log_fail(msg, detalle=""):
-    global fail; fail += 1
-    linea = f"  {rojo('[FAIL]')} {msg}"
+    global fail
+    fail += 1
+    print("  " + rojo("[FAIL]") + " " + msg)
     if detalle:
-        linea += f"\n         {rojo('→')} {detalle}"
-    print(linea)
+        print("         " + rojo("->") + " " + detalle)
 
 def log_warn(msg):
-    global warns; warns += 1
-    print(f"  {amarillo('[WARN]')} {msg}")
+    global warns
+    warns += 1
+    print("  " + amarillo("[WARN]") + " " + msg)
 
 def log_info(msg):
-    print(f"  {cyan('[INFO]')} {msg}")
+    print("  " + cyan("[INFO]") + " " + msg)
 
 def separador(titulo):
-    print(f"\n{negrita(cyan('═' * 60))}")
-    print(f"  {negrita(titulo)}")
-    print(f"{negrita(cyan('═' * 60))}")
+    linea = cyan("=" * 60)
+    print("\n" + negrita(linea))
+    print("  " + negrita(titulo))
+    print(negrita(linea))
 
 # ─────────────────────────────────────────────
 # bloque 0: entorno
 # ─────────────────────────────────────────────
 
 def test_entorno():
-    separador("BLOQUE 0 — COMPROBACION DEL ENTORNO")
+    separador("BLOQUE 0 - COMPROBACION DEL ENTORNO")
 
-    # python >= 3.6
     v = sys.version_info
     if v.major >= 3 and v.minor >= 6:
-        log_ok(f"python {v.major}.{v.minor}.{v.micro}")
+        log_ok("python " + str(v.major) + "." + str(v.minor) + "." + str(v.micro))
     else:
         log_fail("se necesita python 3.6+", sys.version)
 
-    # openssl en PATH
     try:
         r = subprocess.run(["openssl", "version"], capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
-            log_ok(f"openssl: {r.stdout.strip()}")
+            log_ok("openssl: " + r.stdout.strip())
         else:
             log_fail("openssl no responde")
     except FileNotFoundError:
         log_fail("openssl no encontrado en PATH")
 
-    # gcc en PATH
     try:
         r = subprocess.run(["gcc", "--version"], capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
-            log_ok(f"gcc: {r.stdout.splitlines()[0].strip()}")
+            log_ok("gcc: " + r.stdout.splitlines()[0].strip())
         else:
             log_fail("gcc no responde")
     except FileNotFoundError:
-        log_fail("gcc no encontrado en PATH",
-                 "instala MinGW y añadelo al PATH del sistema")
+        log_fail("gcc no encontrado en PATH", "instala MinGW y anyadelo al PATH del sistema")
 
-    # directorio de OpenSSL
     if os.path.isdir(OPENSSL_INC):
-        log_ok(f"directorio include de OpenSSL encontrado: {OPENSSL_INC}")
+        log_ok("directorio include de OpenSSL encontrado: " + OPENSSL_INC)
     else:
-        log_warn(f"no se encuentra {OPENSSL_INC} -> la compilacion puede fallar")
+        log_warn("no se encuentra " + OPENSSL_INC + " -> la compilacion puede fallar")
 
     if os.path.isdir(OPENSSL_LIB):
-        log_ok(f"directorio lib de OpenSSL encontrado: {OPENSSL_LIB}")
+        log_ok("directorio lib de OpenSSL encontrado: " + OPENSSL_LIB)
     else:
-        log_warn(f"no se encuentra {OPENSSL_LIB} -> la compilacion puede fallar")
+        log_warn("no se encuentra " + OPENSSL_LIB + " -> la compilacion puede fallar")
 
-    # libreria cryptography de python
     global CRYPTO_OK
     if CRYPTO_OK:
         log_ok("libreria python 'cryptography' disponible")
@@ -157,12 +150,11 @@ def test_entorno():
             log_fail("no se pudo instalar 'cryptography'", str(e))
             sys.exit(1)
 
-    # escritura en directorio temporal
     try:
         ruta = os.path.join(DIR_TEMP, "test.tmp")
         open(ruta, "w").close()
         os.remove(ruta)
-        log_ok(f"directorio temporal OK: {DIR_TEMP}")
+        log_ok("directorio temporal OK: " + DIR_TEMP)
     except Exception as e:
         log_fail("no se puede escribir en directorio temporal", str(e))
 
@@ -171,7 +163,7 @@ def test_entorno():
 # ─────────────────────────────────────────────
 
 def test_generacion_claves():
-    separador("BLOQUE 1 — GENERACION DE CLAVES RSA (openssl)")
+    separador("BLOQUE 1 - GENERACION DE CLAVES RSA (openssl)")
 
     log_info("generando clave privada RSA-2048...")
     try:
@@ -180,7 +172,7 @@ def test_generacion_claves():
             capture_output=True, text=True, timeout=15
         )
         if r.returncode == 0 and os.path.exists(RUTA_CLAVE_PRIVADA):
-            log_ok(f"clave privada RSA-2048 generada ({os.path.getsize(RUTA_CLAVE_PRIVADA)} bytes)")
+            log_ok("clave privada RSA-2048 generada (" + str(os.path.getsize(RUTA_CLAVE_PRIVADA)) + " bytes)")
         else:
             log_fail("error al generar clave privada", r.stderr.strip())
             return False
@@ -199,7 +191,7 @@ def test_generacion_claves():
             capture_output=True, text=True, timeout=15
         )
         if r.returncode == 0 and os.path.exists(RUTA_CERTIFICADO):
-            log_ok(f"certificado X.509 generado ({os.path.getsize(RUTA_CERTIFICADO)} bytes)")
+            log_ok("certificado X.509 generado (" + str(os.path.getsize(RUTA_CERTIFICADO)) + " bytes)")
         else:
             log_fail("error al generar el certificado", r.stderr.strip())
             return False
@@ -207,7 +199,6 @@ def test_generacion_claves():
         log_fail("excepcion al generar certificado", str(e))
         return False
 
-    # verificar que el certificado es valido
     try:
         r = subprocess.run(
             ["openssl", "verify", "-CAfile", RUTA_CERTIFICADO, RUTA_CERTIFICADO],
@@ -216,11 +207,10 @@ def test_generacion_claves():
         if r.returncode == 0:
             log_ok("verificacion openssl verify del certificado: OK")
         else:
-            log_warn(f"openssl verify: {r.stdout.strip()}")
+            log_warn("openssl verify: " + r.stdout.strip())
     except Exception as e:
-        log_warn(f"no se pudo verificar el certificado: {e}")
+        log_warn("no se pudo verificar el certificado: " + str(e))
 
-    # extraer clave publica
     try:
         r = subprocess.run(
             ["openssl", "x509", "-in", RUTA_CERTIFICADO, "-pubkey", "-noout"],
@@ -239,87 +229,83 @@ def test_generacion_claves():
 # bloque 2: compilacion con gcc
 # ─────────────────────────────────────────────
 
-# rutas de los fuentes C (en el mismo directorio que este tester)
 DIR_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 
 RUTA_SERVIDOR_EXE = os.path.join(DIR_TEMP, "servidor.exe")
 RUTA_CLIENTE_EXE  = os.path.join(DIR_TEMP, "cliente.exe")
 
 def test_compilacion():
-    separador("BLOQUE 2 — COMPILACION CON GCC")
+    separador("BLOQUE 2 - COMPILACION CON GCC")
 
-    # ficheros fuente que deben estar junto al tester
     fuentes_necesarias = ["common.h", "crypto_utils.h",
                           "crypto_utils.c", "servidor.c", "cliente.c"]
     todos_presentes = True
     for f in fuentes_necesarias:
         ruta = os.path.join(DIR_PROYECTO, f)
         if os.path.isfile(ruta):
-            log_ok(f"fuente encontrado: {f}")
+            log_ok("fuente encontrado: " + f)
         else:
-            log_fail(f"fuente NO encontrado: {f}",
-                     f"debe estar en {DIR_PROYECTO}")
+            log_fail("fuente NO encontrado: " + f, "debe estar en " + DIR_PROYECTO)
             todos_presentes = False
 
     if not todos_presentes:
         log_warn("compilacion omitida por ficheros fuente faltantes")
         return False
 
-    # flags de compilacion comunes
+    # flags para MinGW + OpenSSL 1.1.1 en Windows
+    # -lgdi32 y -lcrypt32 son necesarios para OpenSSL en Windows
     flags_comunes = [
-        f"-I{OPENSSL_INC}",
-        f"-L{OPENSSL_LIB}",
-        "-lws2_32", "-lssl", "-lcrypto",
+        "-I" + OPENSSL_INC,
+        "-L" + OPENSSL_LIB,
+        "-lws2_32", "-lssl", "-lcrypto", "-lgdi32", "-lcrypt32",
         "-Wall",
     ]
 
-    # fuentes comunes a ambos ejecutables
     fuente_crypto = os.path.join(DIR_PROYECTO, "crypto_utils.c")
 
-    # ── compilar servidor.exe ──
-    log_info("compilando servidor.exe...")
-    fuente_srv = os.path.join(DIR_PROYECTO, "servidor.c")
-    cmd_srv = (["gcc", fuente_srv, fuente_crypto,
-                "-o", RUTA_SERVIDOR_EXE]
-               + flags_comunes)
-    try:
-        r = subprocess.run(cmd_srv, capture_output=True, text=True, timeout=60,
-                           cwd=DIR_PROYECTO)
-        if r.returncode == 0 and os.path.isfile(RUTA_SERVIDOR_EXE):
-            tam = os.path.getsize(RUTA_SERVIDOR_EXE)
-            log_ok(f"servidor.exe compilado ({tam // 1024} KB)")
-        else:
-            log_fail("error al compilar servidor.exe",
-                     (r.stderr or r.stdout).strip()[:300])
+    def compilar(nombre_exe, fuente_principal, ruta_salida):
+        log_info("compilando " + nombre_exe + "...")
+        cmd = ["gcc", fuente_principal, fuente_crypto, "-o", ruta_salida] + flags_comunes
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               timeout=60, cwd=DIR_PROYECTO)
+            exe_ok = r.returncode == 0 and os.path.isfile(ruta_salida)
+            if exe_ok:
+                tam = os.path.getsize(ruta_salida)
+                log_ok(nombre_exe + " compilado (" + str(tam // 1024) + " KB)")
+                if r.stderr and "warning" in r.stderr.lower():
+                    for linea in r.stderr.splitlines():
+                        if "warning" in linea.lower():
+                            log_warn("gcc warning en " + nombre_exe + ": " + linea.strip()[:120])
+                return True
+            else:
+                salida = (r.stderr or r.stdout).strip()
+                # mostrar todas las lineas con "error" para ver el problema completo
+                errores = [l for l in salida.splitlines() if "error" in l.lower()]
+                if errores:
+                    detalle = "\n         ".join(errores[:10])
+                else:
+                    # si no hay lineas con "error" mostrar todo el output
+                    detalle = salida[:2000]
+                log_fail("error al compilar " + nombre_exe, detalle)
+                return False
+        except Exception as e:
+            log_fail("excepcion compilando " + nombre_exe, str(e))
             return False
-    except Exception as e:
-        log_fail("excepcion compilando servidor.exe", str(e))
-        return False
 
-    # ── compilar cliente.exe ──
-    log_info("compilando cliente.exe...")
+    fuente_srv = os.path.join(DIR_PROYECTO, "servidor.c")
+    ok_srv = compilar("servidor.exe", fuente_srv, RUTA_SERVIDOR_EXE)
+
     fuente_cli = os.path.join(DIR_PROYECTO, "cliente.c")
-    cmd_cli = (["gcc", fuente_cli, fuente_crypto,
-                "-o", RUTA_CLIENTE_EXE]
-               + flags_comunes)
-    try:
-        r = subprocess.run(cmd_cli, capture_output=True, text=True, timeout=60,
-                           cwd=DIR_PROYECTO)
-        if r.returncode == 0 and os.path.isfile(RUTA_CLIENTE_EXE):
-            tam = os.path.getsize(RUTA_CLIENTE_EXE)
-            log_ok(f"cliente.exe compilado ({tam // 1024} KB)")
-        else:
-            log_fail("error al compilar cliente.exe",
-                     (r.stderr or r.stdout).strip()[:300])
-            return False
-    except Exception as e:
-        log_fail("excepcion compilando cliente.exe", str(e))
+    ok_cli = compilar("cliente.exe", fuente_cli, RUTA_CLIENTE_EXE)
+
+    if not ok_srv or not ok_cli:
         return False
 
     return True
 
 # ─────────────────────────────────────────────
-# bloque 3: cifrado RSA (python, logica pura)
+# bloque 3: cifrado RSA
 # ─────────────────────────────────────────────
 
 def cargar_clave_publica():
@@ -344,7 +330,7 @@ def descifrar_con_rsa(priv, datos_cifrados):
         algorithm=hashes.SHA256(), label=None))
 
 def test_cifrado_rsa():
-    separador("BLOQUE 3 — CIFRADO / DESCIFRADO RSA")
+    separador("BLOQUE 3 - CIFRADO / DESCIFRADO RSA")
 
     try:
         pub  = cargar_clave_publica()
@@ -356,28 +342,25 @@ def test_cifrado_rsa():
 
     clave = os.urandom(TAM_CLAVE_AES)
 
-    # cifrado y descifrado basico
     try:
         cifrado    = cifrar_con_rsa(pub, clave)
         descifrado = descifrar_con_rsa(priv, cifrado)
         if descifrado == clave:
-            log_ok(f"cifrado/descifrado RSA-OAEP de clave AES-256 ({TAM_CLAVE_AES} B): OK")
+            log_ok("cifrado/descifrado RSA-OAEP de clave AES-256 (" + str(TAM_CLAVE_AES) + " B): OK")
         else:
             log_fail("la clave descifrada no coincide con la original")
     except Exception as e:
         log_fail("excepcion en cifrado/descifrado RSA", str(e))
 
-    # tamano del bloque cifrado (RSA-2048 -> 256 bytes)
     try:
         cifrado = cifrar_con_rsa(pub, clave)
         if len(cifrado) == TAM_CLAVE_RSA // 8:
-            log_ok(f"tamano bloque RSA cifrado: {len(cifrado)} bytes (correcto RSA-{TAM_CLAVE_RSA})")
+            log_ok("tamano bloque RSA cifrado: " + str(len(cifrado)) + " bytes (correcto RSA-" + str(TAM_CLAVE_RSA) + ")")
         else:
-            log_warn(f"tamano inesperado: {len(cifrado)} bytes")
+            log_warn("tamano inesperado: " + str(len(cifrado)) + " bytes")
     except Exception as e:
         log_fail("error verificando tamano", str(e))
 
-    # descifrado con clave incorrecta debe fallar
     try:
         priv_falsa = rsa.generate_private_key(65537, TAM_CLAVE_RSA, default_backend())
         cifrado    = cifrar_con_rsa(pub, clave)
@@ -387,9 +370,8 @@ def test_cifrado_rsa():
         except Exception:
             log_ok("descifrado con clave RSA incorrecta falla correctamente")
     except Exception as e:
-        log_warn(f"no se pudo probar clave incorrecta: {e}")
+        log_warn("no se pudo probar clave incorrecta: " + str(e))
 
-    # OAEP es probabilistico: mismo dato -> cifrado distinto cada vez
     try:
         c1 = cifrar_con_rsa(pub, clave)
         c2 = cifrar_con_rsa(pub, clave)
@@ -398,10 +380,10 @@ def test_cifrado_rsa():
         else:
             log_warn("los dos cifrados son identicos (padding puede no ser aleatorio)")
     except Exception as e:
-        log_warn(f"no se pudo probar caracter probabilistico: {e}")
+        log_warn("no se pudo probar caracter probabilistico: " + str(e))
 
 # ─────────────────────────────────────────────
-# bloque 4: cifrado AES (python, logica pura)
+# bloque 4: cifrado AES
 # ─────────────────────────────────────────────
 
 def cifrar_aes(clave, iv, datos):
@@ -421,7 +403,7 @@ def descifrar_aes(clave, iv, cifrado):
     return unpad.update(datos_p) + unpad.finalize()
 
 def test_cifrado_aes():
-    separador("BLOQUE 4 — CIFRADO / DESCIFRADO AES-256-CBC")
+    separador("BLOQUE 4 - CIFRADO / DESCIFRADO AES-256-CBC")
 
     clave = os.urandom(TAM_CLAVE_AES)
     iv    = os.urandom(TAM_IV)
@@ -443,13 +425,12 @@ def test_cifrado_aes():
             dec = descifrar_aes(clave, iv, enc)
             ms  = (time.time() - t0) * 1000
             if dec == datos:
-                log_ok(f"AES {nombre}: OK ({ms:.1f} ms)")
+                log_ok("AES " + nombre + ": OK (" + str(round(ms, 1)) + " ms)")
             else:
-                log_fail(f"AES {nombre}: datos no coinciden tras descifrar")
+                log_fail("AES " + nombre + ": datos no coinciden tras descifrar")
         except Exception as e:
-            log_fail(f"AES {nombre}: excepcion", str(e))
+            log_fail("AES " + nombre + ": excepcion", str(e))
 
-    # integridad SHA-256
     try:
         datos  = os.urandom(4096)
         h_orig = hashlib.sha256(datos).hexdigest()
@@ -465,13 +446,13 @@ def test_cifrado_aes():
 # bloque 5: estructura de metadatos
 # ─────────────────────────────────────────────
 
-# debe coincidir EXACTAMENTE con common.h:
-#   uint64_t  longitud_fichero      ->  Q  (8 B)
-#   char      nombre_fichero[256]   -> 256s
-#   char      fecha_hora[20]        ->  20s
+# formato debe coincidir EXACTAMENTE con common.h:
+#   uint64_t  longitud_fichero          ->  Q  (8 B)
+#   char      nombre_fichero[256]       -> 256s
+#   char      fecha_hora[20]            ->  20s
 #   uint8_t   clave_sesion_cifrada[256] -> 256s
-#   uint8_t   iv[16]                ->  16s
-#   int       len_clave_cifrada     ->  i  (4 B)
+#   uint8_t   iv[16]                    ->  16s
+#   int       len_clave_cifrada         ->  i  (4 B)
 #   TOTAL = 560 bytes
 FORMATO_META = "Q256s20s256s16si"
 TAM_META     = struct.calcsize(FORMATO_META)
@@ -495,14 +476,13 @@ def desempaquetar_meta(raw):
             cc, iv, lc)
 
 def test_estructura_metadatos():
-    separador("BLOQUE 5 — ESTRUCTURA DE METADATOS")
+    separador("BLOQUE 5 - ESTRUCTURA DE METADATOS")
 
     if TAM_META == 560:
-        log_ok(f"tamano struct MetadatosFichero: {TAM_META} bytes (correcto)")
+        log_ok("tamano struct MetadatosFichero: " + str(TAM_META) + " bytes (correcto)")
     else:
-        log_warn(f"tamano struct: {TAM_META} bytes (esperado 560)")
+        log_warn("tamano struct: " + str(TAM_META) + " bytes (esperado 560)")
 
-    # serializar y deserializar un struct completo
     try:
         lon_o  = 123456
         nom_o  = "fichero_prueba.txt"
@@ -522,18 +502,17 @@ def test_estructura_metadatos():
         if not errores:
             log_ok("serializacion/deserializacion de todos los campos: OK")
         else:
-            log_fail(f"campos con error: {', '.join(errores)}")
+            log_fail("campos con error: " + ", ".join(errores))
     except Exception as e:
         log_fail("excepcion al serializar metadatos", str(e))
 
-    # uint64 maximo
     try:
         u64max = 2**64 - 1
         raw    = empaquetar_meta(u64max, "t.bin", "2025-01-01 00:00:00",
                                  bytes(256), bytes(TAM_IV), 256)
-        lon_r, *_ = desempaquetar_meta(raw)
+        lon_r  = desempaquetar_meta(raw)[0]
         if lon_r == u64max:
-            log_ok(f"longitud_fichero uint64 maximo: OK")
+            log_ok("longitud_fichero uint64 maximo: OK")
         else:
             log_fail("overflow en longitud_fichero uint64")
     except Exception as e:
@@ -544,7 +523,7 @@ def test_estructura_metadatos():
 # ─────────────────────────────────────────────
 
 def test_conexion_tcp():
-    separador("BLOQUE 6 — CONEXION TCP")
+    separador("BLOQUE 6 - CONEXION TCP")
 
     resultado = {}
 
@@ -558,7 +537,8 @@ def test_conexion_tcp():
             conn, _ = s.accept()
             datos = conn.recv(1024)
             conn.send(datos)
-            conn.close(); s.close()
+            conn.close()
+            s.close()
             resultado["datos"] = datos
         except Exception as e:
             resultado["error"] = str(e)
@@ -583,7 +563,6 @@ def test_conexion_tcp():
     except Exception as e:
         log_fail("error en conexion TCP basica", str(e))
 
-    # puerto cerrado debe rechazar
     try:
         cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         cli.settimeout(2)
@@ -595,7 +574,7 @@ def test_conexion_tcp():
         finally:
             cli.close()
     except Exception as e:
-        log_warn(f"prueba puerto cerrado: {e}")
+        log_warn("prueba puerto cerrado: " + str(e))
 
 # ─────────────────────────────────────────────
 # bloque 7: flujo completo (simulacion python)
@@ -605,31 +584,35 @@ def srv_transferencia(puerto, resultado):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(("127.0.0.1", puerto)); s.listen(1); s.settimeout(10)
-        conn, _ = s.accept(); conn.settimeout(10)
+        s.bind(("127.0.0.1", puerto))
+        s.listen(1)
+        s.settimeout(10)
+        conn, _ = s.accept()
+        conn.settimeout(10)
 
-        # recibir metadatos completos
         raw = b""
         while len(raw) < TAM_META:
             c = conn.recv(TAM_META - len(raw))
-            if not c: break
+            if not c:
+                break
             raw += c
 
         longitud, nombre, fecha, cc, iv, lc = desempaquetar_meta(raw)
         priv      = cargar_clave_privada()
         clave_ses = descifrar_con_rsa(priv, cc[:lc])
-        conn.send(struct.pack("i", 1))  # aceptacion
+        conn.send(struct.pack("i", 1))
 
-        # recibir tamano + bloque cifrado
         tam_c = struct.unpack("Q", conn.recv(8))[0]
         datos_c = b""
         while len(datos_c) < tam_c:
             c = conn.recv(min(4096, tam_c - len(datos_c)))
-            if not c: break
+            if not c:
+                break
             datos_c += c
 
         datos_d = descifrar_aes(clave_ses, iv, datos_c)
-        conn.close(); s.close()
+        conn.close()
+        s.close()
         resultado.update({"ok": True, "datos": datos_d,
                           "longitud": longitud, "nombre": nombre})
     except Exception as e:
@@ -653,7 +636,8 @@ def cli_transferencia(puerto, fichero_bytes, nombre):
 
         resp = struct.unpack("i", s.recv(4))[0]
         if resp != 1:
-            s.close(); return False
+            s.close()
+            return False
 
         enc = cifrar_aes(clave_ses, iv, fichero_bytes)
         s.send(struct.pack("Q", len(enc)))
@@ -667,42 +651,45 @@ def flujo_completo(nombre_test, datos, puerto):
     res = {}
     hilo = threading.Thread(target=srv_transferencia,
                             args=(puerto, res), daemon=True)
-    hilo.start(); time.sleep(0.3)
+    hilo.start()
+    time.sleep(0.3)
     ok_cli = cli_transferencia(puerto, datos, "prueba.bin")
     hilo.join(timeout=15)
 
     if not ok_cli:
-        log_fail(f"{nombre_test}: el cliente fallo"); return
+        log_fail(nombre_test + ": el cliente fallo")
+        return
     if not res.get("ok"):
-        log_fail(f"{nombre_test}: el servidor fallo", res.get("error", "")); return
+        log_fail(nombre_test + ": el servidor fallo", res.get("error", ""))
+        return
     if res.get("datos") == datos:
-        log_ok(f"{nombre_test} ({len(datos)/1024:.1f} KB): OK")
+        log_ok(nombre_test + " (" + str(round(len(datos)/1024, 1)) + " KB): OK")
     else:
-        log_fail(f"{nombre_test}: datos no coinciden",
-                 f"env={len(datos)} B recv={len(res.get('datos',b''))} B")
+        log_fail(nombre_test + ": datos no coinciden",
+                 "env=" + str(len(datos)) + " B recv=" + str(len(res.get("datos", b""))) + " B")
 
 def test_flujo_completo():
-    separador("BLOQUE 7 — FLUJO COMPLETO DE TRANSFERENCIA CIFRADA (python)")
+    separador("BLOQUE 7 - FLUJO COMPLETO DE TRANSFERENCIA CIFRADA (python)")
 
     casos = [
-        ("texto 512 B",            b"Practica APL02 " * 34,       PUERTO_TEST + 10),
-        ("binario 10 KB",          os.urandom(10 * 1024),          PUERTO_TEST + 11),
-        ("binario 500 KB",         os.urandom(500 * 1024),         PUERTO_TEST + 12),
-        ("binario 2 MB",           os.urandom(2 * 1024 * 1024),    PUERTO_TEST + 13),
-        ("exactamente 16 B",       os.urandom(16),                 PUERTO_TEST + 14),
-        ("1 byte",                 os.urandom(1),                  PUERTO_TEST + 15),
-        ("ceros 1 KB",             bytes(1024),                    PUERTO_TEST + 16),
+        ("texto 512 B",         b"Practica APL02 " * 34,       PUERTO_TEST + 10),
+        ("binario 10 KB",       os.urandom(10 * 1024),          PUERTO_TEST + 11),
+        ("binario 500 KB",      os.urandom(500 * 1024),         PUERTO_TEST + 12),
+        ("binario 2 MB",        os.urandom(2 * 1024 * 1024),    PUERTO_TEST + 13),
+        ("exactamente 16 B",    os.urandom(16),                 PUERTO_TEST + 14),
+        ("1 byte",              os.urandom(1),                  PUERTO_TEST + 15),
+        ("ceros 1 KB",          bytes(1024),                    PUERTO_TEST + 16),
     ]
     for nombre, datos, puerto in casos:
         flujo_completo(nombre, datos, puerto)
         time.sleep(0.4)
 
 # ─────────────────────────────────────────────
-# bloque 8: integridad end-to-end con SHA-256
+# bloque 8: integridad SHA-256
 # ─────────────────────────────────────────────
 
 def test_integridad():
-    separador("BLOQUE 8 — INTEGRIDAD END-TO-END (SHA-256)")
+    separador("BLOQUE 8 - INTEGRIDAD END-TO-END (SHA-256)")
 
     for kb, puerto in [(4, PUERTO_TEST + 20), (128, PUERTO_TEST + 21)]:
         datos  = os.urandom(kb * 1024)
@@ -710,38 +697,43 @@ def test_integridad():
         res    = {}
         hilo   = threading.Thread(target=srv_transferencia,
                                   args=(puerto, res), daemon=True)
-        hilo.start(); time.sleep(0.3)
+        hilo.start()
+        time.sleep(0.3)
         cli_transferencia(puerto, datos, "hash.bin")
         hilo.join(timeout=15)
 
         if res.get("ok"):
             h_recv = hashlib.sha256(res["datos"]).hexdigest()
             if h_orig == h_recv:
-                log_ok(f"integridad SHA-256 {kb} KB: hashes identicos")
+                log_ok("integridad SHA-256 " + str(kb) + " KB: hashes identicos")
             else:
-                log_fail(f"integridad {kb} KB: hashes distintos",
-                         f"orig={h_orig[:16]}... recv={h_recv[:16]}...")
+                log_fail("integridad " + str(kb) + " KB: hashes distintos",
+                         "orig=" + h_orig[:16] + "... recv=" + h_recv[:16] + "...")
         else:
-            log_fail(f"integridad {kb} KB: servidor fallo", res.get("error",""))
+            log_fail("integridad " + str(kb) + " KB: servidor fallo", res.get("error", ""))
         time.sleep(0.4)
 
 # ─────────────────────────────────────────────
-# bloque 9: servidor iterativo (python)
+# bloque 9: servidor iterativo
 # ─────────────────────────────────────────────
 
 def srv_iterativo(puerto, n_clientes, resultados):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(("127.0.0.1", puerto)); s.listen(5); s.settimeout(15)
+        s.bind(("127.0.0.1", puerto))
+        s.listen(5)
+        s.settimeout(15)
         priv = cargar_clave_privada()
 
         for _ in range(n_clientes):
-            conn, _ = s.accept(); conn.settimeout(10)
+            conn, _ = s.accept()
+            conn.settimeout(10)
             raw = b""
             while len(raw) < TAM_META:
                 c = conn.recv(TAM_META - len(raw))
-                if not c: break
+                if not c:
+                    break
                 raw += c
             _, _, _, cc, iv, lc = desempaquetar_meta(raw)
             clave = descifrar_con_rsa(priv, cc[:lc])
@@ -750,7 +742,8 @@ def srv_iterativo(puerto, n_clientes, resultados):
             datos_c = b""
             while len(datos_c) < tam_c:
                 c = conn.recv(min(4096, tam_c - len(datos_c)))
-                if not c: break
+                if not c:
+                    break
                 datos_c += c
             resultados.append(descifrar_aes(clave, iv, datos_c))
             conn.close()
@@ -759,7 +752,7 @@ def srv_iterativo(puerto, n_clientes, resultados):
         resultados.append(None)
 
 def test_servidor_iterativo():
-    separador("BLOQUE 9 — SERVIDOR ITERATIVO (multiples clientes)")
+    separador("BLOQUE 9 - SERVIDOR ITERATIVO (multiples clientes)")
 
     n       = 3
     puerto  = PUERTO_TEST + 30
@@ -768,31 +761,31 @@ def test_servidor_iterativo():
 
     hilo = threading.Thread(target=srv_iterativo,
                             args=(puerto, n, recvs), daemon=True)
-    hilo.start(); time.sleep(0.3)
+    hilo.start()
+    time.sleep(0.3)
 
     for i, datos in enumerate(envios):
         time.sleep(0.1)
-        cli_transferencia(puerto, datos, f"cli_{i}.bin")
+        cli_transferencia(puerto, datos, "cli_" + str(i) + ".bin")
 
     hilo.join(timeout=20)
 
     if len(recvs) == n:
         ok_n = sum(1 for o, r in zip(envios, recvs) if r and o == r)
         if ok_n == n:
-            log_ok(f"servidor iterativo: {n} clientes atendidos correctamente")
+            log_ok("servidor iterativo: " + str(n) + " clientes atendidos correctamente")
         else:
-            log_fail(f"servidor iterativo: {ok_n}/{n} transferencias correctas")
+            log_fail("servidor iterativo: " + str(ok_n) + "/" + str(n) + " transferencias correctas")
     else:
-        log_fail(f"servidor iterativo: {len(recvs)}/{n} resultados recibidos")
+        log_fail("servidor iterativo: " + str(len(recvs)) + "/" + str(n) + " resultados recibidos")
 
 # ─────────────────────────────────────────────
 # bloque 10: prueba de los ejecutables reales
 # ─────────────────────────────────────────────
 
 def test_ejecutables_reales():
-    separador("BLOQUE 10 — PRUEBA DE EJECUTABLES REALES (servidor.exe + cliente.exe)")
+    separador("BLOQUE 10 - PRUEBA DE EJECUTABLES REALES (servidor.exe + cliente.exe)")
 
-    # comprobar que los exe existen (los habra compilado el bloque 2)
     if not os.path.isfile(RUTA_SERVIDOR_EXE):
         log_warn("servidor.exe no encontrado -> bloque de compilacion fallo, omitiendo")
         return
@@ -800,36 +793,28 @@ def test_ejecutables_reales():
         log_warn("cliente.exe no encontrado -> bloque de compilacion fallo, omitiendo")
         return
 
-    # crear un fichero de prueba real en el directorio temporal
     ruta_fichero_prueba = os.path.join(DIR_TEMP, "fichero_prueba_real.bin")
-    contenido_original  = os.urandom(64 * 1024)  # 64 KB de datos aleatorios
+    contenido_original  = os.urandom(64 * 1024)
     with open(ruta_fichero_prueba, "wb") as f:
         f.write(contenido_original)
-    log_info(f"fichero de prueba creado: {ruta_fichero_prueba} (64 KB)")
+    log_info("fichero de prueba creado: 64 KB")
 
-    # las claves tienen que estar en el mismo directorio que los exe
-    # copiamos server_key.pem y server_cert.pem al DIR_TEMP donde estan los exe
-    # (ya estan ahi porque RUTA_CLAVE_PRIVADA y RUTA_CERTIFICADO apuntan a DIR_TEMP)
-
-    # arrancar el servidor en segundo plano
     log_info("arrancando servidor.exe...")
     proc_srv = None
     try:
         proc_srv = subprocess.Popen(
             [RUTA_SERVIDOR_EXE],
-            cwd=DIR_TEMP,           # directorio de trabajo = donde estan las claves
+            cwd=DIR_TEMP,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP  # para poder matarlo limpio
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
         )
     except Exception as e:
         log_fail("no se pudo arrancar servidor.exe", str(e))
         return
 
-    # esperar a que el servidor este listo
     time.sleep(1.5)
 
-    # comprobar que el servidor sigue vivo
     if proc_srv.poll() is not None:
         out, err = proc_srv.communicate()
         log_fail("servidor.exe termino prematuramente",
@@ -837,7 +822,6 @@ def test_ejecutables_reales():
         return
     log_ok("servidor.exe arrancado y en escucha")
 
-    # ejecutar el cliente para transferir el fichero de prueba
     log_info("ejecutando cliente.exe...")
     try:
         r_cli = subprocess.run(
@@ -856,33 +840,30 @@ def test_ejecutables_reales():
     except Exception as e:
         log_fail("excepcion ejecutando cliente.exe", str(e))
     finally:
-        # matar el servidor
         try:
             proc_srv.terminate()
             proc_srv.wait(timeout=3)
         except Exception:
             proc_srv.kill()
 
-    # comprobar que el fichero descifrado fue guardado por el servidor
-    nombre_recibido = f"recibido_fichero_prueba_real.bin"
+    nombre_recibido = "recibido_fichero_prueba_real.bin"
     ruta_recibido   = os.path.join(DIR_TEMP, nombre_recibido)
 
     if os.path.isfile(ruta_recibido):
         with open(ruta_recibido, "rb") as f:
             contenido_recibido = f.read()
 
-        # comparar hash SHA-256 del original con el recibido y descifrado
         h_orig = hashlib.sha256(contenido_original).hexdigest()
         h_recv = hashlib.sha256(contenido_recibido).hexdigest()
 
         if h_orig == h_recv:
-            log_ok(f"fichero recibido y descifrado por servidor.exe: integridad SHA-256 OK")
-            log_ok(f"hash: {h_orig[:32]}...")
+            log_ok("fichero recibido y descifrado por servidor.exe: integridad SHA-256 OK")
+            log_ok("hash: " + h_orig[:32] + "...")
         else:
             log_fail("el fichero descifrado por servidor.exe no coincide con el original",
-                     f"orig={h_orig[:16]}... recv={h_recv[:16]}...")
+                     "orig=" + h_orig[:16] + "... recv=" + h_recv[:16] + "...")
     else:
-        log_warn(f"no se encontro '{nombre_recibido}' en {DIR_TEMP}")
+        log_warn("no se encontro '" + nombre_recibido + "' en " + DIR_TEMP)
         log_warn("puede que el servidor no guardo el fichero o uso otro nombre")
 
 # ─────────────────────────────────────────────
@@ -891,37 +872,43 @@ def test_ejecutables_reales():
 
 def resumen_final():
     total = ok + fail
-    print(f"\n{negrita(cyan('═' * 60))}")
-    print(f"  {negrita('RESUMEN FINAL')}")
-    print(f"{negrita(cyan('═' * 60))}")
-    print(f"  total de pruebas : {total}")
-    print(f"  {verde(f'correctas : {ok}')}")
+    linea = cyan("=" * 60)
+    print("\n" + negrita(linea))
+    print("  " + negrita("RESUMEN FINAL"))
+    print(negrita(linea))
+    print("  total de pruebas : " + str(total))
+    print("  " + verde("correctas : " + str(ok)))
     if fail > 0:
-        print(f"  {rojo(f'fallidas  : {fail}')}")
+        print("  " + rojo("fallidas  : " + str(fail)))
     else:
-        print(f"  fallidas  : {fail}")
+        print("  fallidas  : " + str(fail))
     if warns > 0:
-        print(f"  {amarillo(f'avisos    : {warns}')}")
+        print("  " + amarillo("avisos    : " + str(warns)))
     print()
     if fail == 0:
-        print(f"  {verde(negrita('todo correcto'))}")
+        print("  " + verde(negrita("todo correcto")))
     elif fail <= 3:
-        print(f"  {amarillo(negrita('hay fallos menores que revisar'))}")
+        print("  " + amarillo(negrita("hay fallos menores que revisar")))
     else:
-        print(f"  {rojo(negrita('hay fallos importantes'))}")
-    print(f"\n  directorio temporal: {DIR_TEMP}")
-    print(f"  (se borra automaticamente al acabar)\n")
+        print("  " + rojo(negrita("hay fallos importantes")))
+    print("\n  directorio temporal: " + DIR_TEMP)
+    print("  (se borra automaticamente al acabar)\n")
 
 # ─────────────────────────────────────────────
 # punto de entrada
 # ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(f"\n{negrita(cyan('╔' + '═'*58 + '╗'))}")
-    print(f"{negrita(cyan('║'))}  TESTER APL02 — TRANSFERENCIA FICHEROS CIFRADA          {negrita(cyan('║'))}")
-    print(f"{negrita(cyan('║'))}  Ingenieria de Protocolos de Comunicaciones             {negrita(cyan('║'))}")
-    print(f"{negrita(cyan('╚' + '═'*58 + '╝'))}\n")
-    print(f"  inicio: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    borde_top = negrita(cyan("+" + "=" * 58 + "+"))
+    borde_mid = negrita(cyan("|"))
+    borde_bot = negrita(cyan("+" + "=" * 58 + "+"))
+    print()
+    print(borde_top)
+    print(borde_mid + "  TESTER APL02 - TRANSFERENCIA FICHEROS CIFRADA          " + borde_mid)
+    print(borde_mid + "  Ingenieria de Protocolos de Comunicaciones             " + borde_mid)
+    print(borde_bot)
+    print()
+    print("  inicio: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     try:
         test_entorno()
@@ -944,7 +931,7 @@ if __name__ == "__main__":
                 log_warn("bloque 10 omitido: la compilacion fallo")
 
     except KeyboardInterrupt:
-        print(f"\n  {amarillo('pruebas interrumpidas por el usuario')}")
+        print("\n  " + amarillo("pruebas interrumpidas por el usuario"))
     finally:
         try:
             shutil.rmtree(DIR_TEMP)
