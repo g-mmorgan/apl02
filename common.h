@@ -21,20 +21,23 @@
 // con RSA-2048 el output del cifrado es 256 bytes
 #define TAM_CLAVE_CIFRADA 256
 
-// estructura con los metadatos del fichero y la clave de sesion cifrada
-// esto es lo primero que el cliente envia al servidor
+// pragma pack(1) elimina el padding que gcc puede insertar entre campos
+// sin esto sizeof(MetadatosFichero) puede ser 564 en vez de 560
+// y la serializacion cliente<->servidor se rompe
+#pragma pack(push, 1)
 typedef struct {
-    uint64_t  longitud_fichero;                  // tamano del fichero en bytes
-    char      nombre_fichero[MAX_NOMBRE];        // nombre del fichero
-    char      fecha_hora[20];                    // formato: "YYYY-MM-DD HH:MM:SS"
-    uint8_t   clave_sesion_cifrada[TAM_CLAVE_CIFRADA]; // clave AES cifrada con RSA publica del server
-    uint8_t   iv[TAM_IV];                        // iv para AES-CBC, se genera en el cliente
-    int       len_clave_cifrada;                 // longitud real de la clave cifrada (puede variar)
-} MetadatosFichero;
+    uint64_t  longitud_fichero;                   // 8 bytes
+    char      nombre_fichero[MAX_NOMBRE];         // 256 bytes
+    char      fecha_hora[20];                     // 20 bytes
+    uint8_t   clave_sesion_cifrada[TAM_CLAVE_CIFRADA]; // 256 bytes
+    uint8_t   iv[TAM_IV];                         // 16 bytes
+    int       len_clave_cifrada;                  // 4 bytes
+} MetadatosFichero;                               // total: 560 bytes exactos
+#pragma pack(pop)
 
 // respuesta del servidor al cliente tras recibir los metadatos
 typedef struct {
-    int aceptado; // 1 si el servidor acepta la transferencia, 0 si no
+    int aceptado; // 1 si acepta, 0 si rechaza
 } RespuestaServidor;
 
 #endif // COMMON_H

@@ -21,24 +21,38 @@
 // recibe exactamente 'len' bytes del socket
 // recv() puede devolver menos bytes de los pedidos (comportamiento normal en TCP)
 
-static int recibir_todo(SOCKET sock, unsigned char *buf, int len)
+// recibe exactamente 'len' bytes del socket
+// usa size_t en vez de int para no truncar ficheros grandes
+// internamente pide trozos de 65536 porque recv() solo acepta int
+// devuelve 0 si exito, -1 si error o conexion cerrada
+static int recibir_todo(SOCKET sock, unsigned char *buf, size_t len)
 {
-    int total    = 0;
-    int restante = len;
+    size_t total    = 0;
+    size_t restante = len;
 
     while (restante > 0) {
-        // recv es la llamada Winsock equivalente a read() en Berkeley sockets
-        // (temario: RECV System Call - pag INTERFACE SOCKETS)
-        int recibido = recv(sock, (char *)(buf + total), restante, 0);
-        if (recibido <= 0) {
-            // recibido == 0 -> el cliente cerro la conexion
-            // recibido < 0  -> error de red
+        // calculamos cuanto pedimos en esta iteracion
+        // maximo 65536 para que el cast a int sea siempre seguro
+        int a_pedir = (restante > 65536) ? 65536 : (int)restante;
+
+        // recv es la llamada Winsock para recibir datos por TCP
+        int recibido = recv(sock, (char *)(buf + total), a_pedir, 0);
+
+        if (recibido == 0) {
+            // el cliente cerro la conexion antes de enviar todo
             return -1;
         }
-        total    += recibido;
-        restante -= recibido;
+        if (recibido == SOCKET_ERROR) {
+            // error de red
+            printf("[servidor] error en recv: %d\n", WSAGetLastError());
+            return -1;
+        }
+
+        total    += (size_t)recibido;
+        restante -= (size_t)recibido;
     }
-    return total;
+
+    return 0; // todos los bytes recibidos correctamente
 }
  
 // logica completa de atencion a un cliente
@@ -157,8 +171,8 @@ static void atender_cliente(SOCKET sock_cliente)
     free(buf_descifrado);
 
     if ((int)escritos != len_descifrado) {
-        printf("[servidor] error al escribir el fichero: escribio %Iu de %d bytes\n",
-               escritos, len_descifrado); // %Iu es el formato correcto para size_t en MinGW 4.8.1
+        printf("[servidor] error al escribir el fichero: escribio %lu de %d bytes\n",
+               (unsigned long)escritos, len_descifrado);
         return;
     }
 

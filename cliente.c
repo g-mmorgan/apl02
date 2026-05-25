@@ -82,8 +82,9 @@ static unsigned char *leer_fichero(const char *ruta, long *tamano)
     fclose(f);
 
     if ((long)leidos != *tamano) {
-        printf("[cliente] error de lectura: leidos %Iu de %ld bytes\n",
-               leidos, *tamano); // %Iu para size_t en MinGW 4.8.1
+       // %lu con cast a unsigned long es lo mas compatible entre MSVC y MinGW
+        printf("[cliente] error de lectura: leidos %lu de %ld bytes\n",
+               (unsigned long)leidos, *tamano);
         free(buf);
         return NULL;
     }
@@ -241,10 +242,29 @@ int main(int argc, char *argv[])
     printf("[cliente] metadatos enviados al servidor\n");
 
     //paso 2: esperar la aceptacion del servidor
+    // usamos recibir_todo en vez de recv directo para ser consistentes con TCP
     RespuestaServidor resp;
-    int recibido = recv(sock, (char *)&resp, sizeof(resp), 0);
-    if (recibido <= 0 || !resp.aceptado) {
-        printf("[cliente] el servidor rechazo la transferencia o hubo error\n");
+    memset(&resp, 0, sizeof(resp));
+
+    // recibimos_todo garantiza que leemos los 4 bytes aunque lleguen fragmentados
+    int bytes_resp = 0;
+    int restante_resp = (int)sizeof(resp);
+    unsigned char *ptr_resp = (unsigned char *)&resp;
+    while (restante_resp > 0) {
+        int n = recv(sock, (char *)(ptr_resp + bytes_resp), restante_resp, 0);
+        if (n <= 0) {
+            printf("[cliente] error al recibir respuesta del servidor\n");
+            free(buf_fichero);
+            closesocket(sock);
+            WSACleanup();
+            return 1;
+        }
+        bytes_resp    += n;
+        restante_resp -= n;
+    }
+
+    if (!resp.aceptado) {
+        printf("[cliente] el servidor rechazo la transferencia\n");
         free(buf_fichero);
         closesocket(sock);
         WSACleanup();

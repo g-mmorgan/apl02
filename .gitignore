@@ -31,3 +31,6 @@ build/
 # Temporales
 *.tmp
 *.swp
+
+*.txt
+check_arch.py
